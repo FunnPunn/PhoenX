@@ -1,0 +1,3 @@
+# PhoenX
+
+This bot cool 😎
