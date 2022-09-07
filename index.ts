@@ -1,4 +1,4 @@
-import DiscordJS, { GatewayIntentBits, REST , Routes} from 'discord.js'
+import DiscordJS, { EmbedBuilder, embedLength, GatewayIntentBits, REST , Routes, SelectMenuBuilder} from 'discord.js'
 import Keyv from 'keyv'
 import dotenv from 'dotenv'
 import fs from 'node:fs'
@@ -14,8 +14,8 @@ dotenv.config()
 const commands = []
 const commanddir = fs.readdirSync('./commands').filter(file => file.endsWith('.js'))
 
-const keyv = new Keyv('sqlite://Storage/botstorage.sqlite')
-keyv.on('error', err => console.error('Keyv connection error:', err));
+const botstorage = new Keyv('sqlite://Storage/botstorage.sqlite')
+botstorage.on('error', err => console.error('Keyv connection error:', err));
 
 const clientid = '1013808234580156606'
 const guildid = '995264254322147408'
@@ -24,7 +24,6 @@ for (const file of commanddir) {
     const command = require(`./commands/${file}`)
     commands.push(command.data.toJSON())
 }
-console.log(String(process.env.TOKEN))
 
 const rest = new REST({version: '10'}).setToken(String(process.env.TOKEN));
 
@@ -34,6 +33,10 @@ const rest = new REST({version: '10'}).setToken(String(process.env.TOKEN));
 	try {
 		console.log(`Started refreshing ${commands.length} application (/) commands.`);
 
+		const globaldata = await rest.put(
+			Routes.applicationCommands(clientid),
+			{ body: [] },
+		);
 		const data = await rest.put(
 			Routes.applicationGuildCommands(clientid, guildid),
 			{ body: commands },
@@ -45,22 +48,58 @@ const rest = new REST({version: '10'}).setToken(String(process.env.TOKEN));
 	}
 })();
 
+Client.on('ready',() =>{console.log("bot ready")})
+
 Client.on('interactionCreate', async (interaction) =>{
 	if (!interaction.isChatInputCommand()) return;
 	const {commandName, options} = interaction
+	const SendEmb = new EmbedBuilder()
+	var prvt = true
 	switch(commandName) {
 		case 'addini':
-			interaction.reply({
-				content: 'Coming soon',
-				ephemeral: true
-			})
+			const initi = options.getString('initials')!
+			const fullname = options.getString('fullname')!
+			if (await botstorage.has(initi)) {
+				SendEmb.setTitle('Initials').setFields([{name:'ERROR', value:'Initials already exist'}]).setColor([255, 0, 0])
+			} else {
+				botstorage.set(initi, fullname)
+				SendEmb.setTitle('Initials').setFields([{name:'Success!', value:'Added initials!'}]).setColor([244, 174, 114])
+			}
+			
+			
 			break;
 		case 'removeini':
-			interaction.reply({
-				content: 'Coming soon',
-				ephemeral: true
-			})
+			const init = options.getString('initials')!
+			
+			if (await botstorage.get(init) === undefined) {
+				SendEmb.setTitle('Initials').setFields([{name:'ERROR', value:'Unable to find the given initials'}]).setColor([255, 0, 0])	
+			} else {
+				await botstorage.delete(init)
+				SendEmb.setTitle('Initials').setFields([{name:'Success!', value:'Removed Initials!'}]).setColor([244, 174, 114])
+			}
+			break;
+		case 'generate':
+			const time = Math.floor(Date.now() / 1000)
+			const giveninit = options.getString('initials')!
+			if (await botstorage.has(giveninit)) {
+				SendEmb.setTitle('Token').setFields([{name: 'Token generated:', value: '`'.concat(giveninit, ' ActCert - ', String(time), '`')}]).setColor([244, 174, 114])
+			} else {
+				SendEmb.setTitle('Token').setFields([{name:'ERROR', value:'Unable to find the given initials'}]).setColor([255, 0, 0])
+			}
+			break;
+		case 'gettime':
+			const tokenstring = options.getString('token')!
+			const items = tokenstring.split(' ActCert - ')
+			if (await botstorage.has(items[0])) {
+				SendEmb.setTitle('Token').setFields([{name: 'Token info:', value: (await botstorage.get(items[0])).concat("'s token was created <t:", items[1], ':R>')}]).setColor([244, 174, 114])
+			} else {
+				SendEmb.setTitle('Token').setFields([{name:'ERROR', value:'Unable to decode.'}]).setColor([255, 0, 0])
+			}
 			break;
 	}
+	interaction.reply({
+		embeds: [SendEmb],
+		ephemeral: true
+	})
 })
 Client.login(process.env.TOKEN)
