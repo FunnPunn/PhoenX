@@ -1,22 +1,7 @@
-import DiscordJS, { EmbedBuilder, embedLength, GatewayIntentBits, REST , Routes, SelectMenuBuilder} from 'discord.js'
+import DiscordJS, { ActionRowBuilder , ButtonBuilder, ButtonInteraction, ButtonStyle, Channel, Embed, EmbedBuilder, embedLength, GatewayIntentBits, messageLink, REST , Routes, SelectMenuBuilder, TextChannel} from 'discord.js'
 import Keyv from 'keyv'
 import dotenv from 'dotenv'
 import fs from 'node:fs'
-const { Sequelize, Op, Model, DataTypes } = require("sequelize");
-
-const sequelize = new Sequelize({
-	dialect: 'sqlite',
-	storage: 'Storage/quests.sqlite',
-	logging: false
-});
-
-const Tags = sequelize.define('quests', {
-	creator: {
-		type: Sequelize.INTEGER,
-		unique: true,
-	},
-	description: Sequelize.TEXT,
-});
 
 const Client = new DiscordJS.Client({
 	intents: [
@@ -35,6 +20,9 @@ botstorage.on('error', err => console.error('Inits connection error:', err));
 const queststorage = new Keyv('sqlite://Storage/quests.sqlite')
 queststorage.on('error', err => console.error('Quest connection error:', err));
 
+const bdata = new Keyv('sqlite://Storage/quests.sqlite')
+bdata.on('error', err => console.error('Quest connection error:', err));
+
 const clientid = '1013808234580156606'
 const guildid = '995264254322147408'
 const guild = Client.guilds.cache.get(guildid)
@@ -45,7 +33,7 @@ for (const file of commanddir) {
 
 const rest = new REST({version: '10'}).setToken(String(process.env.TOKEN));
 
-
+const questchannel = '995264255106490461';
 
 (async () => {
 	try {
@@ -73,8 +61,10 @@ Client.on('interactionCreate', async (interaction) =>{
 	const {commandName, options} = interaction
 	const SendEmb = new EmbedBuilder()
 	var prvt = true
+	var shouldsend = true
 	switch(commandName) {
 		case 'addini':
+			prvt = true
 			const initi = options.getString('initials')!
 			const fullname = options.getString('fullname')!
 			if (await botstorage.has(initi)) {
@@ -87,6 +77,7 @@ Client.on('interactionCreate', async (interaction) =>{
 			
 			break;
 		case 'removeini':
+			prvt = true
 			const init = options.getString('initials')!
 			
 			if (await botstorage.get(init) === undefined) {
@@ -97,6 +88,7 @@ Client.on('interactionCreate', async (interaction) =>{
 			}
 			break;
 		case 'generate':
+			prvt = true
 			const time = Math.floor(Date.now() / 1000)
 			const giveninit = options.getString('initials')!
 			if (await botstorage.has(giveninit)) {
@@ -106,6 +98,7 @@ Client.on('interactionCreate', async (interaction) =>{
 			}
 			break;
 		case 'tokeninfo':
+			prvt = false
 			const tokenstring = options.getString('token')!
 			const items = tokenstring.split(' ActCert - ')
 			if (await botstorage.has(items[0]) && tokenstring.includes(' ActCert - ')) {
@@ -114,10 +107,63 @@ Client.on('interactionCreate', async (interaction) =>{
 				SendEmb.setTitle('Token').setFields([{name:'ERROR', value:'Unable to decode.'}]).setColor([255, 0, 0])
 			}
 			break;
+		case 'createquest':
+			const questname = options.getString('name')!
+			const questdesc = options.getString('description')!
+			const questreward = options.getString('reward')
+			if (await queststorage.has(questname)) {
+				shouldsend = false
+				await queststorage.set(questname, interaction.user)
+				interaction.reply({
+					content: 'Creating Quest...',
+					ephemeral: true
+				});
+				const QuestEmb = new EmbedBuilder().setTitle(questname).setDescription(questdesc).setAuthor({
+					name: interaction.user.username
+				});
+				const rows = new ActionRowBuilder<ButtonBuilder>()
+					.addComponents(new ButtonBuilder()
+						.setCustomId('remove')
+						.setLabel('remove')
+						.setStyle(ButtonStyle.Danger)
+					)
+				;
+				interaction.reply({
+					embeds: [QuestEmb],
+					components: [rows]
+				})
+			} else {
+				shouldsend = true
+				SendEmb.setTitle('Token').setFields([{name:'ERROR', value:'Quest name already exists.'}]).setColor([255, 0, 0])
+
+			}
+			
+			break;
+		case 'setquestchannel':
+			const chnl = options.getChannel('channel')!
+			await bdata.set('questchannel', chnl)
+			SendEmb.setTitle('Token').setFields([{name: 'Channel:', value: 'set quest channel'}]).setColor([244, 174, 114])
+			break;
 	}
-	interaction.reply({
-		embeds: [SendEmb],
-		ephemeral: true
+	if (true) {
+		await interaction.reply({
+			embeds: [SendEmb],
+			ephemeral: prvt
 	})
+	shouldsend = true
+	}
 })
+
+Client.on('interactionCreate', async (buttoninteract) => {
+	if (!buttoninteract.isButton()) return;
+	const qchan = (await bdata.get('channel') as TextChannel)!
+
+	const msgid = buttoninteract.message.reference?.messageId
+	if (msgid !== undefined) {
+		if ((await qchan.messages.fetch(msgid)).author == buttoninteract.user) {
+			buttoninteract.message.delete()
+		}
+	}
+})
+
 Client.login(process.env.TOKEN)
