@@ -2,6 +2,21 @@ import DiscordJS, { EmbedBuilder, embedLength, GatewayIntentBits, REST , Routes,
 import Keyv from 'keyv'
 import dotenv from 'dotenv'
 import fs from 'node:fs'
+const { Sequelize, Op, Model, DataTypes } = require("sequelize");
+
+const sequelize = new Sequelize({
+	dialect: 'sqlite',
+	storage: 'Storage/quests.sqlite',
+	logging: false
+});
+
+const Tags = sequelize.define('quests', {
+	creator: {
+		type: Sequelize.INTEGER,
+		unique: true,
+	},
+	description: Sequelize.TEXT,
+});
 
 const Client = new DiscordJS.Client({
 	intents: [
@@ -14,8 +29,11 @@ dotenv.config()
 const commands = []
 const commanddir = fs.readdirSync('./commands').filter(file => file.endsWith('.js'))
 
-const botstorage = new Keyv('sqlite://Storage/botstorage.sqlite')
-botstorage.on('error', err => console.error('Keyv connection error:', err));
+const botstorage = new Keyv('sqlite://Storage/inits.sqlite')
+botstorage.on('error', err => console.error('Inits connection error:', err));
+
+const queststorage = new Keyv('sqlite://Storage/quests.sqlite')
+queststorage.on('error', err => console.error('Quest connection error:', err));
 
 const clientid = '1013808234580156606'
 const guildid = '995264254322147408'
@@ -87,10 +105,10 @@ Client.on('interactionCreate', async (interaction) =>{
 				SendEmb.setTitle('Token').setFields([{name:'ERROR', value:'Unable to find the given initials'}]).setColor([255, 0, 0])
 			}
 			break;
-		case 'gettime':
+		case 'tokeninfo':
 			const tokenstring = options.getString('token')!
 			const items = tokenstring.split(' ActCert - ')
-			if (await botstorage.has(items[0])) {
+			if (await botstorage.has(items[0]) && tokenstring.includes(' ActCert - ')) {
 				SendEmb.setTitle('Token').setFields([{name: 'Token info:', value: (await botstorage.get(items[0])).concat("'s token was created <t:", items[1], ':R>')}]).setColor([244, 174, 114])
 			} else {
 				SendEmb.setTitle('Token').setFields([{name:'ERROR', value:'Unable to decode.'}]).setColor([255, 0, 0])
