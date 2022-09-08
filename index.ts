@@ -1,4 +1,4 @@
-import DiscordJS, { ActionRowBuilder , ButtonBuilder, ButtonInteraction, ButtonStyle, Channel, Embed, EmbedBuilder, embedLength, GatewayIntentBits, messageLink, REST , Routes, SelectMenuBuilder, TextChannel} from 'discord.js'
+import DiscordJS, { ActionRowBuilder , ButtonBuilder, ButtonInteraction, ButtonStyle, Channel, ChatInputCommandInteraction, Embed, EmbedBuilder, embedLength, GatewayIntentBits, Interaction, Message, messageLink, REST , Routes, SelectMenuBuilder, TextChannel} from 'discord.js'
 import Keyv from 'keyv'
 import dotenv from 'dotenv'
 import fs from 'node:fs'
@@ -17,10 +17,7 @@ const commanddir = fs.readdirSync('./commands').filter(file => file.endsWith('.j
 const botstorage = new Keyv('sqlite://Storage/inits.sqlite')
 botstorage.on('error', err => console.error('Inits connection error:', err));
 
-const queststorage = new Keyv('sqlite://Storage/quests.sqlite')
-queststorage.on('error', err => console.error('Quest connection error:', err));
-
-const bdata = new Keyv('sqlite://Storage/quests.sqlite')
+const bdata = new Keyv('sqlite://Storage/botdata.sqlite')
 bdata.on('error', err => console.error('Quest connection error:', err));
 
 const clientid = '1013808234580156606'
@@ -32,8 +29,6 @@ for (const file of commanddir) {
 }
 
 const rest = new REST({version: '10'}).setToken(String(process.env.TOKEN));
-
-const questchannel = '995264255106490461';
 
 (async () => {
 	try {
@@ -57,11 +52,10 @@ const questchannel = '995264255106490461';
 Client.on('ready',() =>{console.log("bot ready")})
 
 Client.on('interactionCreate', async (interaction) =>{
-	if (!interaction.isChatInputCommand()) return;
+	if (interaction.isChatInputCommand()) {
 	const {commandName, options} = interaction
 	const SendEmb = new EmbedBuilder()
 	var prvt = true
-	var shouldsend = true
 	switch(commandName) {
 		case 'addini':
 			prvt = true
@@ -74,7 +68,7 @@ Client.on('interactionCreate', async (interaction) =>{
 				SendEmb.setTitle('Initials').setFields([{name:'Success!', value:'Added initials!'}]).setColor([244, 174, 114])
 			}
 			
-			
+			sendTheEmbed(interaction, SendEmb, true)
 			break;
 		case 'removeini':
 			prvt = true
@@ -86,6 +80,7 @@ Client.on('interactionCreate', async (interaction) =>{
 				await botstorage.delete(init)
 				SendEmb.setTitle('Initials').setFields([{name:'Success!', value:'Removed Initials!'}]).setColor([244, 174, 114])
 			}
+			sendTheEmbed(interaction, SendEmb, true)
 			break;
 		case 'generate':
 			prvt = true
@@ -96,6 +91,7 @@ Client.on('interactionCreate', async (interaction) =>{
 			} else {
 				SendEmb.setTitle('Token').setFields([{name:'ERROR', value:'Unable to find the given initials'}]).setColor([255, 0, 0])
 			}
+			sendTheEmbed(interaction, SendEmb, true)
 			break;
 		case 'tokeninfo':
 			prvt = false
@@ -106,64 +102,70 @@ Client.on('interactionCreate', async (interaction) =>{
 			} else {
 				SendEmb.setTitle('Token').setFields([{name:'ERROR', value:'Unable to decode.'}]).setColor([255, 0, 0])
 			}
+			sendTheEmbed(interaction, SendEmb, true)
 			break;
 		case 'createquest':
 			const questname = options.getString('name')!
 			const questdesc = options.getString('description')!
-			const questreward = options.getString('reward')
-			if (await queststorage.has(questname)) {
-				shouldsend = false
-				await queststorage.set(questname, interaction.user)
-				interaction.reply({
-					content: 'Creating Quest...',
-					ephemeral: true
-				});
-				const QuestEmb = new EmbedBuilder().setTitle(questname).setDescription(questdesc).setAuthor({
-					name: interaction.user.username
-				});
-				const rows = new ActionRowBuilder<ButtonBuilder>()
-					.addComponents(new ButtonBuilder()
-						.setCustomId('remove')
-						.setLabel('remove')
-						.setStyle(ButtonStyle.Danger)
-					)
-				;
-				interaction.reply({
-					embeds: [QuestEmb],
-					components: [rows]
-				})
-			} else {
-				shouldsend = true
-				SendEmb.setTitle('Token').setFields([{name:'ERROR', value:'Quest name already exists.'}]).setColor([255, 0, 0])
+			const questreward = options.getString('reward')!
 
-			}
-			
+			SendEmb.setTitle('Initials').setFields([{name:'Success!', value:'Created Quest!'}]).setColor([244, 174, 114])
+			const QuestEmb = new EmbedBuilder().setTitle(interaction.user.username.concat('#',interaction.user.discriminator ," 's Quest: ", questname)).setDescription(questdesc).setAuthor({
+				name: String(interaction.user.id),
+				iconURL: interaction.user.avatarURL()!
+			});
+			QuestEmb.setFields([{name: 'Reward: ', value: questreward}])
+			const rows = new ActionRowBuilder<ButtonBuilder>()
+				.addComponents(new ButtonBuilder()
+					.setCustomId('remove')
+					.setLabel('🗑️')
+					.setStyle(ButtonStyle.Danger)
+				)
+			;
+			interaction.reply({
+				embeds: [QuestEmb],
+				components: [rows],
+				ephemeral: false
+			})
 			break;
 		case 'setquestchannel':
 			const chnl = options.getChannel('channel')!
-			await bdata.set('questchannel', chnl)
+			await bdata.set('questchannel', String(chnl.id))
 			SendEmb.setTitle('Token').setFields([{name: 'Channel:', value: 'set quest channel'}]).setColor([244, 174, 114])
+			sendTheEmbed(interaction, SendEmb, true)
 			break;
 	}
-	if (true) {
-		await interaction.reply({
-			embeds: [SendEmb],
-			ephemeral: prvt
-	})
-	shouldsend = true
-	}
-})
-
-Client.on('interactionCreate', async (buttoninteract) => {
-	if (!buttoninteract.isButton()) return;
-	const qchan = (await bdata.get('channel') as TextChannel)!
-
-	const msgid = buttoninteract.message.reference?.messageId
-	if (msgid !== undefined) {
-		if ((await qchan.messages.fetch(msgid)).author == buttoninteract.user) {
-			buttoninteract.message.delete()
+	} else if (interaction.isButton()) {
+		if (interaction.customId == 'remove') {
+			if (interaction.message.embeds[0].author?.name === String(interaction.user.id)) {
+				interaction.message.delete()
+			} else interaction.reply({
+				content: "This isn't your quest",
+				ephemeral: true
+			})
 		}
-	}
+		//const channeldata = await bdata.get('channel')!
+		//const QChannel = Client.channels.cache.get(channeldata)
+
+		//if (QChannel !== undefined) if (QChannel.isTextBased()) {
+		//	const msgid = interaction.message.reference?.messageId!
+		//	const msg = await QChannel.messages.fetch(msgid)
+		//	if (msgid !== undefined && (msg.author.id == interaction.user.id)) {
+		//		interaction.message.delete()
+		//	} else console.warn("Message is undefined/doesn't match: ", String(msgid), String(msg.author.username))
+//
+		//} else console.warn("Channel is undefined/not text based", String(QChannel))
+
+		
+		
+	} else return;
 })
+
+function sendTheEmbed(replyint: ChatInputCommandInteraction, embToSend: EmbedBuilder, isPrivate : boolean) {
+	replyint.reply({
+		embeds: [embToSend],
+		ephemeral: isPrivate
+	})
+}
 
 Client.login(process.env.TOKEN)

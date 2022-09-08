@@ -13,6 +13,6 @@ const data = new SlashCommandBuilder()
 				option.setName('description').setDescription('Description of your quest.').setRequired(true)
 				).addStringOption(option => 
 
-                    option.setName('reward').setDescription('The reward you will give.').setRequired(false)
+                    option.setName('reward').setDescription('The reward you will give.').setRequired(true)
                     )
 module.exports = {data}
