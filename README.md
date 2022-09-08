@@ -1,3 +1,3 @@
 # PhoenX
 
-This bot cool 😎
+This `#0969DA`bot is **cool** 😎
