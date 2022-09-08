@@ -1,6 +1,3 @@
 # PhoenX
 
-This bot cool 😎
-```lua
-local
-```
+This `#0969DA bot` is **cool** 😎
