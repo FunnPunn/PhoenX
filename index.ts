@@ -117,11 +117,12 @@ Client.on('interactionCreate', async (interaction) =>{
 				ephemeral: false
 			})
 			break;
-		case 'init':
-			const subby = options.getSubcommand()
+		case 'ini':
+			const subby = options.getSubcommand(true)!
 			const initi = options.getString('initials')!
 			switch (subby) {
 				case 'add':
+					
 					if (!checkroles(interaction)) return;
 					prvt = true
 					const fullname = options.getString('fullname')!
@@ -135,6 +136,7 @@ Client.on('interactionCreate', async (interaction) =>{
 					sendTheEmbed(interaction, SendEmb, true)
 					break;
 				case 'remove':
+					
 					if (!checkroles(interaction)) return;
 					prvt = true
 					
