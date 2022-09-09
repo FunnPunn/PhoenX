@@ -14,5 +14,8 @@ const data = new SlashCommandBuilder()
 				).addStringOption(option => 
 
                     option.setName('reward').setDescription('The reward you will give.').setRequired(true)
-                    )
+                    ).addBooleanOption(option => 
+
+						option.setName('isroyal').setDescription('OWNERS ONLY').setRequired(true)
+						)
 module.exports = {data}

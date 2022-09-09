@@ -1,4 +1,4 @@
-import DiscordJS, { ActionRowBuilder , ButtonBuilder, ButtonInteraction, ButtonStyle, Channel, ChatInputCommandInteraction, Embed, EmbedBuilder, embedLength, GatewayIntentBits, Interaction, Message, messageLink, REST , Routes, SelectMenuBuilder, TextChannel} from 'discord.js'
+import DiscordJS, { ActionRowBuilder , ButtonBuilder, ButtonInteraction, ButtonStyle, Channel, ChatInputCommandInteraction, Embed, EmbedBuilder, embedLength, GatewayIntentBits, GuildMember, Interaction, Message, messageLink, REST , Role, Routes, SelectMenuBuilder, TextChannel} from 'discord.js'
 import Keyv from 'keyv'
 import dotenv from 'dotenv'
 import fs from 'node:fs'
@@ -14,19 +14,21 @@ dotenv.config()
 const commands = []
 const commanddir = fs.readdirSync('./commands').filter(file => file.endsWith('.js'))
 
-const botstorage = new Keyv('sqlite://Storage/inits.sqlite')
+
+const botstorage = new Keyv('postgresql://funn:85G3BvIvisUKL8QB797jqQ@free-tier13.aws-eu-central-1.cockroachlabs.cloud:26257/defaultdb?sslmode=verify-full&options=--cluster%3Doldest-chinook-3288')
 botstorage.on('error', err => console.error('Inits connection error:', err));
 
 const bdata = new Keyv('sqlite://Storage/botdata.sqlite')
 bdata.on('error', err => console.error('Quest connection error:', err));
 
 const clientid = '1013808234580156606'
-const guildid = '995264254322147408'
-const guild = Client.guilds.cache.get(guildid)
+const guildid = '1008747177281065001'
+const guild = Client.guilds.cache.get(guildid)!
 for (const file of commanddir) {
     const command = require(`./commands/${file}`)
     commands.push(command.data.toJSON())
 }
+// guild.roles.create({name: 'PhoenX admin'})
 
 const rest = new REST({version: '10'}).setToken(String(process.env.TOKEN));
 
@@ -49,7 +51,9 @@ const rest = new REST({version: '10'}).setToken(String(process.env.TOKEN));
 	}
 })();
 
-Client.on('ready',() =>{console.log("bot ready")})
+Client.on('ready',() =>{console.log("bot ready")
+	
+})
 
 Client.on('interactionCreate', async (interaction) =>{
 	if (interaction.isChatInputCommand()) {
@@ -58,6 +62,7 @@ Client.on('interactionCreate', async (interaction) =>{
 	var prvt = true
 	switch(commandName) {
 		case 'addini':
+			if (!checkroles(interaction)) return;
 			prvt = true
 			const initi = options.getString('initials')!
 			const fullname = options.getString('fullname')!
@@ -71,6 +76,7 @@ Client.on('interactionCreate', async (interaction) =>{
 			sendTheEmbed(interaction, SendEmb, true)
 			break;
 		case 'removeini':
+			if (!checkroles(interaction)) return;
 			prvt = true
 			const init = options.getString('initials')!
 			
@@ -83,6 +89,7 @@ Client.on('interactionCreate', async (interaction) =>{
 			sendTheEmbed(interaction, SendEmb, true)
 			break;
 		case 'generate':
+			if (!checkroles(interaction)) return;
 			prvt = true
 			const time = Math.floor(Date.now() / 1000)
 			const giveninit = options.getString('initials')!
@@ -94,6 +101,7 @@ Client.on('interactionCreate', async (interaction) =>{
 			sendTheEmbed(interaction, SendEmb, true)
 			break;
 		case 'tokeninfo':
+			if (!checkroles(interaction)) return;
 			prvt = false
 			const tokenstring = options.getString('token')!
 			const items = tokenstring.split(' ActCert - ')
@@ -108,13 +116,18 @@ Client.on('interactionCreate', async (interaction) =>{
 			const questname = options.getString('name')!
 			const questdesc = options.getString('description')!
 			const questreward = options.getString('reward')!
-
+			const royal = options.getBoolean('isroyal')
 			SendEmb.setTitle('Initials').setFields([{name:'Success!', value:'Created Quest!'}]).setColor([244, 174, 114])
-			const QuestEmb = new EmbedBuilder().setTitle(interaction.user.username.concat('#',interaction.user.discriminator ," 's Quest: ", questname)).setDescription(questdesc).setAuthor({
-				name: String(interaction.user.id),
+			const QuestEmb = new EmbedBuilder().setTitle(interaction.user.username.concat(" 's Quest: ", questname)).setDescription(questdesc).setFooter({text: interaction.user.id, iconURL: interaction.user.avatarURL()!}).setAuthor({
+				name: interaction.user.username.concat('#', interaction.user.discriminator),
 				iconURL: interaction.user.avatarURL()!
 			});
-			QuestEmb.setFields([{name: 'Reward: ', value: questreward}])
+			QuestEmb.setFields([{name: 'Reward: ', value: questreward}]).setColor([120, 190, 33])
+			if (royal) {
+				 QuestEmb.setColor([255, 68, 0])
+				 QuestEmb.setTitle('Town Quest [IMPORTANT]')
+				 QuestEmb.setAuthor({name: String(interaction.user.username.concat('#' ,interaction.user.discriminator)), iconURL: 'https://cdn.discordapp.com/avatars/1013808234580156606/bf971e651e0b441c9b4bb12a830b824c.webp'})
+			} else QuestEmb.setColor([255, 222, 122])
 			const rows = new ActionRowBuilder<ButtonBuilder>()
 				.addComponents(new ButtonBuilder()
 					.setCustomId('remove')
@@ -128,16 +141,17 @@ Client.on('interactionCreate', async (interaction) =>{
 				ephemeral: false
 			})
 			break;
-		case 'setquestchannel':
-			const chnl = options.getChannel('channel')!
-			await bdata.set('questchannel', String(chnl.id))
-			SendEmb.setTitle('Token').setFields([{name: 'Channel:', value: 'set quest channel'}]).setColor([244, 174, 114])
-			sendTheEmbed(interaction, SendEmb, true)
+		case 'nanderiscool':
+			if (!checkroles(interaction)) return;
+			interaction.reply({
+				content: 'Natte_Kaas knows that nander is cool',
+				ephemeral: false
+			})
 			break;
 	}
 	} else if (interaction.isButton()) {
 		if (interaction.customId == 'remove') {
-			if (interaction.message.embeds[0].author?.name === String(interaction.user.id)) {
+			if (interaction.message.embeds[0].footer?.text === String(interaction.user.id)) {
 				interaction.message.delete()
 			} else interaction.reply({
 				content: "This isn't your quest",
@@ -160,6 +174,12 @@ Client.on('interactionCreate', async (interaction) =>{
 		
 	} else return;
 })
+
+function checkroles(interact:ChatInputCommandInteraction) {
+	if (interact.inCachedGuild()) if (interact.member.roles.cache.some(r => r.name === "PhoenX admin")){
+		return true;
+	} else return false;
+}
 
 function sendTheEmbed(replyint: ChatInputCommandInteraction, embToSend: EmbedBuilder, isPrivate : boolean) {
 	replyint.reply({
