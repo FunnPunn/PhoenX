@@ -12,10 +12,18 @@ const data = new SlashCommandBuilder()
 
 				option.setName('description').setDescription('Description of your quest.').setRequired(true)
 				).addStringOption(option => 
-
-                    option.setName('reward').setDescription('The reward you will give.').setRequired(true)
-                    ).addBooleanOption(option => 
-
-						option.setName('isroyal').setDescription('OWNERS ONLY').setRequired(true)
+					option.setName('category').setDescription('what type of quest is it?').setRequired(true).addChoices(
+						{name: 'Building', value: 'Building: building'},
+						{name: 'Area Clearing', value: 'Building: Area clearing'},
+						{name: 'Farming', value: 'Gathering: farming'},
+						{name: 'Mining', value: 'Gathering: mining'},
+						{name: 'Fighting', value: 'Combat'},
+						{name: 'Other', value: 'Other: unknown'}
 						)
+					).addStringOption(option => 
+                	    option.setName('reward').setDescription('The reward you will give.').setRequired(true)
+                    	).addBooleanOption(option => 
+
+							option.setName('isroyal').setDescription('OWNERS ONLY').setRequired(true)
+							)
 module.exports = {data}

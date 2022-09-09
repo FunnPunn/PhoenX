@@ -1,4 +1,4 @@
-import DiscordJS, { ActionRowBuilder , ButtonBuilder, ButtonInteraction, ButtonStyle, Channel, ChatInputCommandInteraction, Embed, EmbedBuilder, embedLength, GatewayIntentBits, GuildMember, Interaction, Message, messageLink, REST , Role, Routes, SelectMenuBuilder, TextChannel} from 'discord.js'
+import DiscordJS, { ActionRowBuilder , ButtonBuilder, ButtonInteraction, ButtonStyle, Channel, ChatInputCommandInteraction, Embed, EmbedBuilder, embedLength, GatewayIntentBits, GuildMember, inlineCode, Interaction, Message, messageLink, REST , Role, Routes, SelectMenuBuilder, TextChannel} from 'discord.js'
 import Keyv from 'keyv'
 import dotenv from 'dotenv'
 import fs from 'node:fs'
@@ -15,7 +15,7 @@ const commands = []
 const commanddir = fs.readdirSync('./commands').filter(file => file.endsWith('.js'))
 
 
-const botstorage = new Keyv('postgresql://funn:85G3BvIvisUKL8QB797jqQ@free-tier13.aws-eu-central-1.cockroachlabs.cloud:26257/defaultdb?sslmode=verify-full&options=--cluster%3Doldest-chinook-3288')
+const botstorage = new Keyv('sqlite://Storage/inits.sqlite')
 botstorage.on('error', err => console.error('Inits connection error:', err));
 
 const bdata = new Keyv('sqlite://Storage/botdata.sqlite')
@@ -61,33 +61,6 @@ Client.on('interactionCreate', async (interaction) =>{
 	const SendEmb = new EmbedBuilder()
 	var prvt = true
 	switch(commandName) {
-		case 'addini':
-			if (!checkroles(interaction)) return;
-			prvt = true
-			const initi = options.getString('initials')!
-			const fullname = options.getString('fullname')!
-			if (await botstorage.has(initi)) {
-				SendEmb.setTitle('Initials').setFields([{name:'ERROR', value:'Initials already exist'}]).setColor([255, 0, 0])
-			} else {
-				botstorage.set(initi, fullname)
-				SendEmb.setTitle('Initials').setFields([{name:'Success!', value:'Added initials!'}]).setColor([244, 174, 114])
-			}
-			
-			sendTheEmbed(interaction, SendEmb, true)
-			break;
-		case 'removeini':
-			if (!checkroles(interaction)) return;
-			prvt = true
-			const init = options.getString('initials')!
-			
-			if (await botstorage.get(init) === undefined) {
-				SendEmb.setTitle('Initials').setFields([{name:'ERROR', value:'Unable to find the given initials'}]).setColor([255, 0, 0])	
-			} else {
-				await botstorage.delete(init)
-				SendEmb.setTitle('Initials').setFields([{name:'Success!', value:'Removed Initials!'}]).setColor([244, 174, 114])
-			}
-			sendTheEmbed(interaction, SendEmb, true)
-			break;
 		case 'generate':
 			if (!checkroles(interaction)) return;
 			prvt = true
@@ -113,20 +86,23 @@ Client.on('interactionCreate', async (interaction) =>{
 			sendTheEmbed(interaction, SendEmb, true)
 			break;
 		case 'createquest':
+			if (interaction.channel !== await bdata.get('questchannel')) {interaction.reply({content: "This isn't the right channel"}); break;}
 			const questname = options.getString('name')!
 			const questdesc = options.getString('description')!
 			const questreward = options.getString('reward')!
+			const questcat = options.getString('category')!
 			const royal = options.getBoolean('isroyal')
+
 			SendEmb.setTitle('Initials').setFields([{name:'Success!', value:'Created Quest!'}]).setColor([244, 174, 114])
 			const QuestEmb = new EmbedBuilder().setTitle(interaction.user.username.concat(" 's Quest: ", questname)).setDescription(questdesc).setFooter({text: interaction.user.id, iconURL: interaction.user.avatarURL()!}).setAuthor({
 				name: interaction.user.username.concat('#', interaction.user.discriminator),
 				iconURL: interaction.user.avatarURL()!
 			});
-			QuestEmb.setFields([{name: 'Reward: ', value: questreward}]).setColor([120, 190, 33])
+			QuestEmb.setFields([{name: 'Category: ', value: questcat, inline: true}, {name: 'Reward: ', value: questreward, inline: true}]).setColor([120, 190, 33])
 			if (royal) {
 				 QuestEmb.setColor([255, 68, 0])
-				 QuestEmb.setTitle('Town Quest [IMPORTANT]')
-				 QuestEmb.setAuthor({name: String(interaction.user.username.concat('#' ,interaction.user.discriminator)), iconURL: 'https://cdn.discordapp.com/avatars/1013808234580156606/bf971e651e0b441c9b4bb12a830b824c.webp'})
+				 QuestEmb.setTitle('Town Quest: '+ questname)
+				 QuestEmb.setAuthor({name: 'Team Phoenix Town', iconURL: 'https://cdn.discordapp.com/avatars/1013808234580156606/bf971e651e0b441c9b4bb12a830b824c.webp'})
 			} else QuestEmb.setColor([255, 222, 122])
 			const rows = new ActionRowBuilder<ButtonBuilder>()
 				.addComponents(new ButtonBuilder()
@@ -140,6 +116,37 @@ Client.on('interactionCreate', async (interaction) =>{
 				components: [rows],
 				ephemeral: false
 			})
+			break;
+		case 'init':
+			const subby = options.getSubcommand()
+			const initi = options.getString('initials')!
+			switch (subby) {
+				case 'add':
+					if (!checkroles(interaction)) return;
+					prvt = true
+					const fullname = options.getString('fullname')!
+					if (await botstorage.has(initi)) {
+						SendEmb.setTitle('Initials').setFields([{name:'ERROR', value:'Initials already exist'}]).setColor([255, 0, 0])
+					} else {
+						botstorage.set(initi, fullname)
+						SendEmb.setTitle('Initials').setFields([{name:'Success!', value:'Added initials!'}]).setColor([244, 174, 114])
+					}
+					
+					sendTheEmbed(interaction, SendEmb, true)
+					break;
+				case 'remove':
+					if (!checkroles(interaction)) return;
+					prvt = true
+					
+					if (await botstorage.get(initi) === undefined) {
+						SendEmb.setTitle('Initials').setFields([{name:'ERROR', value:'Unable to find the given initials'}]).setColor([255, 0, 0])	
+					} else {
+						await botstorage.delete(initi)
+						SendEmb.setTitle('Initials').setFields([{name:'Success!', value:'Removed Initials!'}]).setColor([244, 174, 114])
+					}
+					sendTheEmbed(interaction, SendEmb, true)
+					break;
+			}
 			break;
 		case 'nanderiscool':
 			if (!checkroles(interaction)) return;
