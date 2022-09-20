@@ -21,6 +21,9 @@ botstorage.on('error', err => console.error('Inits connection error:', err));
 const bdata = new Keyv('sqlite://Storage/botdata.sqlite')
 bdata.on('error', err => console.error('Quest connection error:', err));
 
+const link = new Keyv('sqlite://Storage/link.sqlite')
+link.on('error', err => console.error('Link connection error:', err));
+
 const clientid = '1013808234580156606'
 const guildid = '1008747177281065001'
 const guild = Client.guilds.cache.get(guildid)!
@@ -86,15 +89,16 @@ Client.on('interactionCreate', async (interaction) =>{
 			sendTheEmbed(interaction, SendEmb, true)
 			break;
 		case 'createquest':
-			if (interaction.channel !== await bdata.get('questchannel')) {interaction.reply({content: "This isn't the right channel"}); break;}
+			if (String(interaction.channel?.id) !== await bdata.get('questchannel')) {interaction.reply({content: "This isn't the right channel"}); console.log('Questchannel:'.concat(await bdata.get('questchannel'), ', channel: ', String(interaction.channel?.id))); break;}
+			if (!(await link.has(interaction.user.id))) break;
 			const questname = options.getString('name')!
 			const questdesc = options.getString('description')!
 			const questreward = options.getString('reward')!
 			const questcat = options.getString('category')!
 			const royal = options.getBoolean('isroyal')
-
+			const namer = (await link.get(interaction.user.id)as string)!
 			SendEmb.setTitle('Initials').setFields([{name:'Success!', value:'Created Quest!'}]).setColor([244, 174, 114])
-			const QuestEmb = new EmbedBuilder().setTitle(interaction.user.username.concat(" 's Quest: ", questname)).setDescription(questdesc).setFooter({text: interaction.user.id, iconURL: interaction.user.avatarURL()!}).setAuthor({
+			const QuestEmb = new EmbedBuilder().setTitle(namer.concat(" 's Quest: ", questname)).setDescription(questdesc).setFooter({text: interaction.user.id, iconURL: interaction.user.avatarURL()!}).setAuthor({
 				name: interaction.user.username.concat('#', interaction.user.discriminator),
 				iconURL: interaction.user.avatarURL()!
 			});
@@ -120,6 +124,7 @@ Client.on('interactionCreate', async (interaction) =>{
 		case 'ini':
 			const subby = options.getSubcommand(true)!
 			const initi = options.getString('initials')!
+			const dsc = options.getUser('user')!
 			switch (subby) {
 				case 'add':
 					
@@ -127,9 +132,10 @@ Client.on('interactionCreate', async (interaction) =>{
 					prvt = true
 					const fullname = options.getString('fullname')!
 					if (await botstorage.has(initi)) {
-						SendEmb.setTitle('Initials').setFields([{name:'ERROR', value:'Initials already exist'}]).setColor([255, 0, 0])
+						SendEmb.setTitle('Initials').setFields([{name:'ERROR', value:'Initials '.concat(initi, ' already exist for ', await botstorage.get(initi))}]).setColor([255, 0, 0])
 					} else {
 						botstorage.set(initi, fullname)
+						link.set(dsc.id, fullname)
 						SendEmb.setTitle('Initials').setFields([{name:'Success!', value:'Added initials!'}]).setColor([244, 174, 114])
 					}
 					
@@ -153,9 +159,21 @@ Client.on('interactionCreate', async (interaction) =>{
 		case 'nanderiscool':
 			if (!checkroles(interaction)) return;
 			interaction.reply({
-				content: 'Natte_Kaas knows that nander is cool',
+				content: 'Nander is cool',
 				ephemeral: false
 			})
+			break;
+		case 'setchannel':
+			if (!checkroles(interaction)) break;
+			const chnl = options.getChannel('channel')!
+			const kind = options.getSubcommand(true)!
+			switch (kind){
+			case 'quest':
+				await bdata.set('questchannel', chnl.id)
+				SendEmb.setTitle('Channel').setFields([{name:'Success!', value:'changed channel'}]).setColor([244, 174, 114])
+				sendTheEmbed(interaction, SendEmb, true)
+				break;
+			}
 			break;
 	}
 	} else if (interaction.isButton()) {

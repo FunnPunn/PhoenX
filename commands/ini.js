@@ -12,7 +12,11 @@ const data = new SlashCommandBuilder()
                 .setRequired(true)
                 ).addStringOption(option => 
                     option.setName('fullname').setDescription('Who are these initials for?').setRequired(true)
-                    )
+                    ).addUserOption(option =>
+                        option.setName('user')
+                        .setDescription('The discord user for those initials')
+                        .setRequired(true)
+                        )
     )).addSubcommand(((subcommand) =>
     subcommand.setName('remove')
     .setDescription('Removes initials')
